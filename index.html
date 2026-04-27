@@ -96,7 +96,9 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbztujvkMN3_8lUxuyR4TJy4MS9Gy8tNmBVyVPR2CF5MbV_zLQyesCDNdFR82KN3oEiS/exec";
+   <script>
+    // 1. อย่าลืมเอาลิงก์ URL สีฟ้าของคุณมาใส่ตรงนี้แทนนะครับ
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx46w9w2cWRgM0mh122GuaiE_0nJzsacEljEqwYT7Qt__bwRFIzmjm7FaHcls0Lncam/exec";
 
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString('th-TH'); }, 1000);
     document.getElementById('date').valueAsDate = new Date();
@@ -106,19 +108,29 @@
         if(!amount || amount <= 0) return alert("กรุณาระบุเงิน");
         document.getElementById('loader').style.display = 'flex';
         
+        // แก้ไขให้ชื่อตัวแปรตรงกับ Apps Script (name, date, category, amount, type)
         const payload = {
-            user: document.getElementById('user').value,
+            name: document.getElementById('user').value,
+            date: document.getElementById('date').value,
             category: document.getElementById('category').value,
             amount: parseFloat(amount),
-            type: type,
-            date: document.getElementById('date').value
+            type: type
         };
 
         try {
-            await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify(payload) });
+            // เพิ่ม mode: 'no-cors' เพื่อให้ส่งข้อมูลจาก GitHub ไป Google ได้
+            await fetch(SCRIPT_URL, { 
+                method: "POST", 
+                mode: 'no-cors',
+                body: JSON.stringify(payload) 
+            });
+            
             document.getElementById('amount').value = "";
-            await loadData();
-        } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); }
+            alert("บันทึกสำเร็จ!");
+            location.reload(); // รีเฟรชหน้าเพื่ออัปเดต Dashboard และประวัติ
+        } catch (e) { 
+            alert("เกิดข้อผิดพลาดในการบันทึก"); 
+        }
         document.getElementById('loader').style.display = 'none';
     }
 
@@ -127,7 +139,9 @@
             const res = await fetch(SCRIPT_URL);
             const data = await res.json();
             updateUI(data);
-        } catch (e) { document.getElementById('list').innerText = "โหลดข้อมูลไม่สำเร็จ"; }
+        } catch (e) { 
+            document.getElementById('list').innerText = "ยังไม่มีข้อมูลหรือโหลดไม่สำเร็จ"; 
+        }
     }
 
     function updateUI(rows) {
@@ -137,14 +151,19 @@
         let stats = { 'ติณห์ภัทร': {inc:0, exp:0, sav:0}, 'นัฐณวรรณ': {inc:0, exp:0, sav:0} };
 
         rows.forEach(row => {
-            const [time, user, cat, amt, type] = row;
+            // เรียงลำดับตามที่บันทึกใน Sheets: [Timestamp, Name, Date, Category, Amount, Type]
+            const [time, user, date, cat, amt, type] = row;
             const val = parseFloat(amt);
+            
             if(type === 'saving-in') vault += val;
             if(type === 'saving-out') vault -= val;
-            if(type === 'income') stats[user].inc += val;
-            if(type === 'expense') stats[user].exp += val;
-            if(type === 'saving-in') stats[user].sav += val;
-            if(type === 'saving-out') stats[user].sav -= val;
+            
+            if(stats[user]) {
+                if(type === 'income') stats[user].inc += val;
+                if(type === 'expense') stats[user].exp += val;
+                if(type === 'saving-in') stats[user].sav += val;
+                if(type === 'saving-out') stats[user].sav -= val;
+            }
         });
 
         document.getElementById('vault-total').innerText = vault.toLocaleString(undefined,{minimumFractionDigits:2});
@@ -156,14 +175,14 @@
         document.getElementById('n-sav').innerText = stats['นัฐณวรรณ'].sav.toLocaleString();
 
         rows.reverse().slice(0, 20).forEach(row => {
-            const [time, user, cat, amt, type] = row;
+            const [time, user, date, cat, amt, type] = row;
             const isT = user === 'ติณห์ภัทร';
             const color = type === 'income' ? 'var(--income)' : (type.includes('saving') ? 'var(--saving)' : 'var(--expense)');
             listDiv.innerHTML += `
                 <div class="item">
                     <div>
                         <span class="tag ${isT ? 'tag-t' : 'tag-n'}">${user}</span> <strong>${cat}</strong><br>
-                        <small style="color:#94a3b8">${new Date(time).toLocaleTimeString('th-TH')} (${type === 'saving-in' ? 'ฝากออม' : (type === 'saving-out' ? 'ถอนออม' : 'จ่าย/รับ')})</small>
+                        <small style="color:#94a3b8">${date} (${type === 'saving-in' ? 'ฝากออม' : (type === 'saving-out' ? 'ถอนออม' : 'ทั่วไป')})</small>
                     </div>
                     <div style="color:${color}; font-weight:600;">${type==='income'||type==='saving-out' ? '+' : '-'}${parseFloat(amt).toLocaleString()}</div>
                 </div>`;
@@ -171,5 +190,3 @@
     }
     loadData();
 </script>
-</body>
-</html>
